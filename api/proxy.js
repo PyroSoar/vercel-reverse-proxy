@@ -1,5 +1,4 @@
 export default async function handler(req, res) {
-  // 处理跨域预检请求
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
@@ -8,7 +7,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  // 判断是 /api/ 还是 /fetch/
   let targetUrl;
   if (req.url.startsWith('/api/')) {
     targetUrl = decodeURIComponent(req.url.replace(/^\/api\//, ''));
@@ -19,7 +17,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  // 修复 https:/ → https://, http:/ → http://
   if (targetUrl.startsWith('https:/') && !targetUrl.startsWith('https://')) {
     targetUrl = targetUrl.replace('https:/', 'https://');
   }
@@ -27,32 +24,47 @@ export default async function handler(req, res) {
     targetUrl = targetUrl.replace('http:/', 'http://');
   }
 
-  // 最终合法性检查
   if (!targetUrl.startsWith('http')) {
     res.status(400).send('invalid url: ' + targetUrl);
     return;
   }
 
   try {
-    // /api/ 保留请求头和请求体，/fetch/ 简单 GET
+    const isApi = req.url.startsWith('/api/');
     const response = await fetch(targetUrl, {
-      method: req.url.startsWith('/api/') ? req.method : 'GET',
-      headers: req.url.startsWith('/api/') ? req.headers : undefined,
-      body: req.url.startsWith('/api/') && req.method === 'POST' ? req.body : undefined,
+      method: isApi ? req.method : 'GET',
+      headers: isApi ? req.headers : undefined,
+      body: isApi && req.method === 'POST' ? req.body : undefined,
       redirect: 'manual',
     });
 
-    // 复制响应头
-    response.headers.forEach((value, key) => res.setHeader(key, value));
+    // 复制响应头，但去掉 content-encoding
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== 'content-encoding') {
+        res.setHeader(key, value);
+      }
+    });
 
-    // 添加跨域许可
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
 
-    // 返回响应
     res.status(response.status);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    res.send(buffer);
+
+    if (isApi) {
+      // 客户端调用，返回 JSON 或文本
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        res.json(data);
+      } else {
+        const text = await response.text();
+        res.send(text);
+      }
+    } else {
+      // 浏览器直接访问资源，返回二进制
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
+    }
   } catch (err) {
     res.status(502).send('proxy error: ' + err.message);
   }
