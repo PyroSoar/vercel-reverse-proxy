@@ -32,7 +32,18 @@ export default async function handler(req, res) {
   try {
     const isApi = req.url.startsWith('/api/');
 
-    // ✅ 检查 Content-Type 是否允许
+    // 先发 HEAD 请求检查大小和类型
+    const headResp = await fetch(targetUrl, { method: 'HEAD' });
+    const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
+    const contentType = headResp.headers.get('content-type') || '';
+
+    // 大小检查
+    if (contentLength > 1024 * 1024) {
+      res.status(413).send('Resource too large (>1MB).');
+      return;
+    }
+
+    // 类型检查（仅 /api/）
     if (isApi) {
       const allowedTypes = [
         'text/',
@@ -46,14 +57,14 @@ export default async function handler(req, res) {
         'text/event-stream',
         'application/vnd.api+json'
       ];
-      const contentType = req.headers['content-type'] || '';
       const isAllowed = allowedTypes.some(type => contentType.startsWith(type));
-      if (!isAllowed && req.method !== 'GET') {
+      if (!isAllowed) {
         res.status(415).send('Unsupported Media Type: ' + contentType);
         return;
       }
     }
 
+    // 通过检查后再发起真正请求
     const response = await fetch(targetUrl, {
       method: isApi ? req.method : 'GET',
       headers: isApi ? req.headers : undefined,
@@ -70,7 +81,6 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
     res.setHeader('X-Proxy-Method', req.method);
-    // ✅ 避免非法字符，安全设置 header
     try {
       const safeUrl = new URL(targetUrl);
       res.setHeader('X-Proxy-Target', safeUrl.origin + safeUrl.pathname);
@@ -80,15 +90,9 @@ export default async function handler(req, res) {
 
     res.status(response.status);
 
-    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
-    if (contentLength > 1024 * 1024) {
-      res.status(413).send('Resource too large (>1MB). If you need to fetch large files, please contact: lzctuhao@outlook.com.');
-      return;
-    }
-
     if (isApi) {
-      const contentType = response.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
+      const respType = response.headers.get('content-type') || '';
+      if (respType.includes('application/json')) {
         const data = await response.json();
         res.json(data);
       } else {
