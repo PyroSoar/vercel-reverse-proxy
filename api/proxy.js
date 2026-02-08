@@ -7,7 +7,13 @@ export default async function handler(req, res) {
     return;
   }
 
-  const targetUrl = req.url.replace(/^\/api\//, '');
+  let targetUrl = decodeURIComponent(req.url.replace(/^\/fetch\//, ''));
+  if (targetUrl.startsWith('https:/') && !targetUrl.startsWith('https://')) {
+    targetUrl = targetUrl.replace('https:/', 'https://');
+  }
+  if (targetUrl.startsWith('http:/') && !targetUrl.startsWith('http://')) {
+    targetUrl = targetUrl.replace('http:/', 'http://');
+  }
   if (!targetUrl.startsWith('http')) {
     res.status(400).send('invalid url');
     return;
