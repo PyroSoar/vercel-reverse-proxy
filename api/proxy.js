@@ -31,6 +31,29 @@ export default async function handler(req, res) {
 
   try {
     const isApi = req.url.startsWith('/api/');
+
+    // ✅ 检查 Content-Type 是否允许
+    if (isApi) {
+      const allowedTypes = [
+        'text/',
+        'application/json',
+        'application/xml',
+        'text/xml',
+        'application/x-www-form-urlencoded',
+        'multipart/form-data',
+        'application/octet-stream',
+        'application/x-ndjson',
+        'text/event-stream',
+        'application/vnd.api+json'
+      ];
+      const contentType = req.headers['content-type'] || '';
+      const isAllowed = allowedTypes.some(type => contentType.startsWith(type));
+      if (!isAllowed && req.method !== 'GET') {
+        res.status(415).send('Unsupported Media Type: ' + contentType);
+        return;
+      }
+    }
+
     const response = await fetch(targetUrl, {
       method: isApi ? req.method : 'GET',
       headers: isApi ? req.headers : undefined,
@@ -38,7 +61,6 @@ export default async function handler(req, res) {
       redirect: 'manual',
     });
 
-    // 复制响应头，但去掉 content-encoding
     response.headers.forEach((value, key) => {
       if (key.toLowerCase() !== 'content-encoding') {
         res.setHeader(key, value);
@@ -47,13 +69,17 @@ export default async function handler(req, res) {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
-    // 在复制响应头之后，额外加上代理信息
     res.setHeader('X-Proxy-Method', req.method);
-    res.setHeader('X-Proxy-Target', targetUrl);
+    // ✅ 避免非法字符，安全设置 header
+    try {
+      const safeUrl = new URL(targetUrl);
+      res.setHeader('X-Proxy-Target', safeUrl.origin + safeUrl.pathname);
+    } catch {
+      res.setHeader('X-Proxy-Target', encodeURI(targetUrl));
+    }
 
     res.status(response.status);
 
-    // 统一大小检查
     const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
     if (contentLength > 1024 * 1024) {
       res.status(413).send('Resource too large (>1MB). If you need to fetch large files, please contact: lzctuhao@outlook.com.');
@@ -61,7 +87,6 @@ export default async function handler(req, res) {
     }
 
     if (isApi) {
-      // 客户端调用，返回 JSON 或文本
       const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         const data = await response.json();
@@ -71,16 +96,8 @@ export default async function handler(req, res) {
         res.send(text);
       }
     } else {
-      // 浏览器直接访问资源
-      if (contentLength === 0) {
-        // 没有 Content-Length，直接放行
-        const buffer = Buffer.from(await response.arrayBuffer());
-        res.send(buffer);
-      } else {
-        // 有 Content-Length 且未超过限制
-        const buffer = Buffer.from(await response.arrayBuffer());
-        res.send(buffer);
-      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
     }
   } catch (err) {
     res.status(502).send('proxy error: ' + err.message);
