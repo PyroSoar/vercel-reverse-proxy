@@ -1,46 +1,83 @@
-# vercel-reverse-proxy
-[English README](./README_EN.md)
+# Vercel Proxy Service
 
-本项目是vercel反向代理。完全免费，万能代理，可代理全网一切接口，包括openai、github、google等等。http和https接口、单页面均可代理，在网络环境不好的情况下均可用。（直接浏览器打开代理页面的情况下，由于某些js和css的路径可能会不对造成访问不到，页面样式有点小问题。）
+A simple HTTP proxy built with Vercel Serverless Functions. It helps bypass CORS restrictions and allows direct resource fetching.
 
-vercel现在每月有100GB的免费流量。本人又基于[cloudflare](https://www.cloudflare.com/)搞了一个反向代理，仓库地址：[cloudflare-reverse-proxy](https://github.com/gaboolic/cloudflare-reverse-proxy)供大家参考，也作为一个备份吧。
-我自己的vercel项目部署失败，疑似被ban，各位别直接一键部署了，先fork到自己的仓库改改项目名 删掉readme试试吧。实在不行 移步上面cloudflare项目，cloudflare的格局比较大
+## Features
+- **`/api/`**  
+  Full proxy interface for client-side scripts.  
+  - Forwards request headers and body.  
+  - Returns response headers and body intact.  
+  - Adds CORS headers.
 
-## 部署
-[![Vercel](https://vercel.com/button)](https://vercel.com/import/project?template=https://github.com/gaboolic/vercel-reverse-proxy)
+- **`/fetch/`**  
+  Direct proxy for browsers.  
+  - Fetches target resources without extra parameters.  
+  - Useful for images, audio, or other assets.
 
+- **OPTIONS Handling**  
+  Responds to CORS preflight requests with permissive headers.
+
+## Usage
+- Proxy API requests:  
+  ```
+  https://your-vercel-app.vercel.app/api/https://example.com/data.json
+  ```
+- Fetch resources directly:  
+  ```
+  https://your-vercel-app.vercel.app/fetch/https://example.com/image.png
+  ```
+
+## Deployment
+- Place proxy handlers in the `api/` directory (`proxy.js`, `fetch.js`).  
+- Configure `vercel.json` rewrites:
+  ```json
+  {
+    "rewrites": [
+      { "source": "/api/(.*)", "destination": "/api/proxy" },
+      { "source": "/fetch/(.*)", "destination": "/api/fetch" }
+    ]
+  }
+  ```
+
+---
+
+# Vercel 代理服务
+
+一个基于 Vercel Serverless Functions 的轻量级 HTTP 代理，用于绕过 CORS 限制并直接获取外部资源。
+
+## 功能
+- **`/api/`**  
+  面向客户端脚本的完整代理接口。  
+  - 转发请求头和请求体。  
+  - 原样返回响应头和响应体。  
+  - 自动添加跨域许可头。
+
+- **`/fetch/`**  
+  面向浏览器的简化直链代理。  
+  - 无需额外参数，直接抓取目标资源。  
+  - 适合加载图片、音频等资源。
+
+- **OPTIONS 预检请求**  
+  自动返回跨域许可响应。
 
 ## 使用方法
-1 部署。部署有两种方法，一是直接点击上方按钮一键部署，二是可以先fork本项目，再登录[vercel](https://vercel.com/)网站新建。vercel可以通过github一键注册只需要绑定手机号支持cn
-![新建项目](img/newproject.png)
+- 代理 API 请求：  
+  ```
+  https://your-vercel-app.vercel.app/api/https://example.com/data.json
+  ```
+- 直接加载资源：  
+  ```
+  https://your-vercel-app.vercel.app/fetch/https://example.com/image.png
+  ```
 
-2 绑定自己的域名(不是必须，使用vercel自带的子域名也可以，但是自带的域名vercel.app在国内网络环境不好的情况下不可用) 可以申请[tk免费域名](http://www.dot.tk/)或者薅小域名注册商首年免费羊毛
-![绑定域名](img/domain.png)
-绑定域名时按照vercel上的说明配置即可，其实就是在你的域名上配了一个子域名，cname到vercel服务器
-
-3 访问 域名/proxy/url  或者/httpproxy/url即可。
-映射规则为/proxy/url映射到https接口，/httpproxy/url映射到http接口
-
-## 示例
-例1 访问https://替换为你自己的域名.com/proxy/api.openai.com/v1/chat/completions 
-实际上会替换为https://api.openai.com/v1/chat/completions
-![demo1](img/demo1.png)
-
-如何在一些常见的开源项目中使用？
-一般开源项目都是引用的openai的库，可以看到里面有一个属性是api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
-
-所以使用的时候只需要设置一下openai.api_base="https://你的域名/proxy/api.openai.com/v1" 就可以了
-
-例2 访问https://替换为你自己的域名.com/proxy/raw.githubusercontent.com/gaboolic/vercel-reverse-proxy/main/vercel.json
-实际上会替换为https://raw.githubusercontent.com/gaboolic/vercel-reverse-proxy/main/vercel.json
-![demo2](img/demo2.png)
-映射规则为/proxy/url映射到https接口，/httpproxy/url映射到http接口
-
-也可用于github下载加速。假如原始链接是https://objects.githubusercontent.com/github-production-release-asset-2e65be/xxxxxx 
-改为https://替换为你自己的域名.com/proxy/objects.githubusercontent.com/github-production-release-asset-2e65be/xxxxxx 就可以加速了。下图是github原始链接和加速后对比。可以看到效果杠杠的，每秒50kb小水管变成了每秒2mb的大水管
-![github-download](img/github-download.png)
-
-例3 访问https://替换为你自己的域名.com/proxy/www.google.com/search?q=vercel-reverse-proxy
-实际上会替换为https://www.google.com/search?q=vercel-reverse-proxy
-![demo3](img/demo3.png)
-代理google搜索结果页面
+## 部署
+- 在 `api/` 目录下放置代理函数（`proxy.js`、`fetch.js`）。  
+- 在 `vercel.json` 中配置路径重写：
+  ```json
+  {
+    "rewrites": [
+      { "source": "/api/(.*)", "destination": "/api/proxy" },
+      { "source": "/fetch/(.*)", "destination": "/api/fetch" }
+    ]
+  }
+  ```
