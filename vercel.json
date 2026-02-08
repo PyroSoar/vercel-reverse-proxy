@@ -1,6 +1,6 @@
 {
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/proxy" },
-    { "source": "/fetch/(.*)", "destination": "/api/fetch" }
+    { "source": "/fetch/(.*)", "destination": "/api/proxy" }
   ]
 }
