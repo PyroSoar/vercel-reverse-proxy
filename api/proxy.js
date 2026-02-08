@@ -47,6 +47,10 @@ export default async function handler(req, res) {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
+    // 在复制响应头之后，额外加上代理信息
+    res.setHeader('X-Proxy-Method', req.method);
+    res.setHeader('X-Proxy-Target', targetUrl);
+
     res.status(response.status);
 
     // 统一大小检查
