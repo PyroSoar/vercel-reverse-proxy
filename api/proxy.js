@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     targetUrl = targetUrl.replace('http:/', 'http://');
   }
   if (!targetUrl.startsWith('http')) {
-    res.status(400).send('invalid url');
+    res.status(400).send('invalid url: ' + targetUrl);
     return;
   }
 
