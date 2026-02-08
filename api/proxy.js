@@ -47,8 +47,14 @@ export default async function handler(req, res) {
 
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
-
     res.status(response.status);
+
+    // 统一大小检查
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    if (contentLength > 1024 * 1024) {
+      res.status(413).send('Resource too large (>1MB). If you need to fetch large files, please contact: lzctuhao@outlook.com.');
+      return;
+    }
 
     if (isApi) {
       // 客户端调用，返回 JSON 或文本
@@ -61,9 +67,16 @@ export default async function handler(req, res) {
         res.send(text);
       }
     } else {
-      // 浏览器直接访问资源，返回二进制
-      const buffer = Buffer.from(await response.arrayBuffer());
-      res.send(buffer);
+      // 浏览器直接访问资源
+      if (contentLength === 0) {
+        // 没有 Content-Length，直接放行
+        const buffer = Buffer.from(await response.arrayBuffer());
+        res.send(buffer);
+      } else {
+        // 有 Content-Length 且未超过限制
+        const buffer = Buffer.from(await response.arrayBuffer());
+        res.send(buffer);
+      }
     }
   } catch (err) {
     res.status(502).send('proxy error: ' + err.message);
