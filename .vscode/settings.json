@@ -1,0 +1,4 @@
+{
+    "remote.SSH.httpProxy": "http://127.0.0.1:10808",
+    "remote.SSH.httpsProxy": "https://127.0.0.1:10808"
+}

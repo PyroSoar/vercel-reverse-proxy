@@ -14,7 +14,10 @@ export default async function handler(req, res) {
   if (targetUrl.startsWith('http:/') && !targetUrl.startsWith('http://')) {
     targetUrl = targetUrl.replace('http:/', 'http://');
   }
-
+  if (!targetUrl.startsWith('http')) {
+    res.status(400).send('invalid url: ' + targetUrl);
+    return;
+  }
   try {
     const response = await fetch(targetUrl);
     response.headers.forEach((value, key) => res.setHeader(key, value));

@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  let targetUrl = decodeURIComponent(req.url.replace(/^\/fetch\//, ''));
+  let targetUrl = decodeURIComponent(req.url.replace(/^\/api\//, ''));
   if (targetUrl.startsWith('https:/') && !targetUrl.startsWith('https://')) {
     targetUrl = targetUrl.replace('https:/', 'https://');
   }
@@ -27,10 +27,7 @@ export default async function handler(req, res) {
       redirect: 'manual',
     });
 
-    response.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
-
+    response.headers.forEach((value, key) => res.setHeader(key, value));
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Expose-Headers', '*');
 
