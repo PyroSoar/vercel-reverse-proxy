@@ -83,7 +83,13 @@ export default async function handler(req, res) {
     // 请求体处理
     let body;
     if (isApi && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
-      body = await req.text();
+      if (typeof req.body === 'string') {
+        body = req.body;
+      } else if (req.body instanceof Buffer) {
+        body = req.body;
+      } else if (req.body) {
+        body = JSON.stringify(req.body);
+      }
     }
 
     const response = await fetch(targetUrl, {
