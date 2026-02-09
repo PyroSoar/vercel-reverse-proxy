@@ -83,7 +83,9 @@ export default async function handler(req, res) {
     });
 
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'content-encoding') {
+      const lowerKey = key.toLowerCase();
+      // 排除 CORS 和 content-encoding 相关的头，由代理统一处理
+      if (!['content-encoding', 'access-control-allow-origin', 'access-control-allow-methods', 'access-control-allow-headers', 'access-control-expose-headers', 'access-control-allow-credentials'].includes(lowerKey)) {
         res.setHeader(key, value);
       }
     });
