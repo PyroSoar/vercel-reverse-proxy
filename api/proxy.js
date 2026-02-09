@@ -2,7 +2,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      req.headers['access-control-request-headers'] || 'Content-Type, Authorization'
+    );
     res.status(204).end();
     return;
   }
@@ -32,18 +35,16 @@ export default async function handler(req, res) {
   try {
     const isApi = req.url.startsWith('/api/');
 
-    // 先发 HEAD 请求检查大小和类型
+    // HEAD 请求检查大小和类型
     const headResp = await fetch(targetUrl, { method: 'HEAD' });
     const contentLength = parseInt(headResp.headers.get('content-length') || '0', 10);
     const contentType = headResp.headers.get('content-type') || '';
 
-    // 大小检查
     if (contentLength > 1024 * 1024) {
       res.status(413).send('Resource too large (>1MB).');
       return;
     }
 
-    // 类型检查（仅 /api/）
     if (isApi) {
       const allowedTypes = [
         'text/',
@@ -64,27 +65,36 @@ export default async function handler(req, res) {
       }
     }
 
-    // 通过检查后再发起真正请求
-    const requestHeaders = isApi ? { ...req.headers } : {};
-    
-    // 生成虚假 referrer（使用目标域名）
+    // 构造请求头
+    const requestHeaders = {};
+    if (req.headers['content-type']) {
+      requestHeaders['content-type'] = req.headers['content-type'];
+    }
+    if (req.headers['authorization']) {
+      requestHeaders['authorization'] = req.headers['authorization'];
+    }
     try {
       const targetUrlObj = new URL(targetUrl);
-      requestHeaders['Referrer'] = targetUrlObj.origin + '/';
+      requestHeaders['Referer'] = targetUrlObj.origin + '/';
     } catch {
-      requestHeaders['Referrer'] = targetUrl;
+      requestHeaders['Referer'] = targetUrl;
+    }
+
+    // 请求体处理
+    let body;
+    if (isApi && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      body = await req.text();
     }
 
     const response = await fetch(targetUrl, {
       method: isApi ? req.method : 'GET',
       headers: requestHeaders,
-      body: isApi && req.method === 'POST' ? req.body : undefined,
+      body,
       redirect: 'manual',
     });
 
     response.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
-      // 排除 CORS 和 content-encoding 相关的头，由代理统一处理
       if (!['content-encoding', 'access-control-allow-origin', 'access-control-allow-methods', 'access-control-allow-headers', 'access-control-expose-headers', 'access-control-allow-credentials'].includes(lowerKey)) {
         res.setHeader(key, value);
       }
