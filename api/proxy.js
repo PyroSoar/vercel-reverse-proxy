@@ -65,9 +65,19 @@ export default async function handler(req, res) {
     }
 
     // 通过检查后再发起真正请求
+    const requestHeaders = isApi ? { ...req.headers } : {};
+    
+    // 生成虚假 referrer（使用目标域名）
+    try {
+      const targetUrlObj = new URL(targetUrl);
+      requestHeaders['Referrer'] = targetUrlObj.origin + '/';
+    } catch {
+      requestHeaders['Referrer'] = targetUrl;
+    }
+
     const response = await fetch(targetUrl, {
       method: isApi ? req.method : 'GET',
-      headers: isApi ? req.headers : undefined,
+      headers: requestHeaders,
       body: isApi && req.method === 'POST' ? req.body : undefined,
       redirect: 'manual',
     });
