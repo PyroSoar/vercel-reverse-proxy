@@ -45,7 +45,7 @@
 </head>
 <body>
   <h1>Vercel Proxy 使用说明</h1>
-  <p><code><b>[ServerDomain]</b></code><code>https://proxy2.lzc2002.top/</code>。</p>
+  <p><code><b>[ServerDomain]</b></code><code>https://proxy2.lzc2002.top</code>。</p>
   <p>本代理服务器提供两种调用方式：<code>/api/</code> 和 <code>/fetch/</code>。它们的用途和限制不同，适合不同场景。</p>
   <p>提示：<a href="https://proxy1.lzc2002.top">Proxy1 服务器</a></p>
 
@@ -58,7 +58,7 @@
     <li>响应处理：根据 <code>Content-Type</code> 返回 JSON 或文本。</li>
     <li>限制：只允许以下 Content-Type：
       <ul>
-        <li><code>text/</code></li>
+        <li><code>text/*</code></li>
         <li><code>application/json</code></li>
         <li><code>application/xml</code>, <code>text/xml</code></li>
         <li><code>application/x-www-form-urlencoded</code></li>
