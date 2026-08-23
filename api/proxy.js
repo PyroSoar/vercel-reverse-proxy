@@ -1,7 +1,43 @@
+const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH', 'QUERY', 'DELETE']);
+const NON_FORWARDABLE_HEADERS = new Set([
+  'connection',
+  'content-length',
+  'host',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]);
+
+function forgeHeaders(headers, targetUrlObj) {
+  const requestHeaders = new Headers();
+  const connectionHeaders = String(headers.connection || '')
+    .split(',')
+    .map(name => name.trim().toLowerCase())
+    .filter(Boolean);
+  const excludedHeaders = new Set([...NON_FORWARDABLE_HEADERS, ...connectionHeaders]);
+
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined || excludedHeaders.has(name.toLowerCase())) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) requestHeaders.append(name, item);
+    } else {
+      requestHeaders.set(name, value);
+    }
+  }
+
+  requestHeaders.set('referer', targetUrlObj.origin + '/');
+  requestHeaders.set('origin', targetUrlObj.origin);
+  return requestHeaders;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,QUERY,DELETE,HEAD,OPTIONS');
     res.setHeader(
       'Access-Control-Allow-Headers',
       req.headers['access-control-request-headers'] || 'Content-Type, Authorization'
@@ -65,24 +101,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // 构造请求头
-    const requestHeaders = {};
-    if (req.headers['content-type']) {
-      requestHeaders['content-type'] = req.headers['content-type'];
-    }
-    if (req.headers['authorization']) {
-      requestHeaders['authorization'] = req.headers['authorization'];
-    }
-    try {
-      const targetUrlObj = new URL(targetUrl);
-      requestHeaders['Referer'] = targetUrlObj.origin + '/';
-    } catch {
-      requestHeaders['Referer'] = targetUrl;
-    }
+    // Preserve end-to-end headers and identify the request as target-origin traffic.
+    const requestHeaders = forgeHeaders(req.headers, new URL(targetUrl));
 
     // 请求体处理
     let body;
-    if (isApi && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    // Preserve content for methods that define or commonly negotiate it.
+    // DELETE content has no general semantics, but is forwarded when supplied
+    // so APIs with an explicit client-origin agreement continue to work.
+    if (isApi && BODY_METHODS.has(req.method)) {
       if (typeof req.body === 'string') {
         body = req.body;
       } else if (req.body instanceof Buffer) {
