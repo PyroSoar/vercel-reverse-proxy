@@ -23,34 +23,41 @@
 
   <h2>/api/ 接口</h2>
   <p><code>/api/</code> 用于客户端调用 API，支持多种请求方法（GET、POST、PUT、PATCH、QUERY、DELETE、HEAD）。</p>
+  <p><strong>目标地址有两种写法</strong>，效果相同，推荐第二种：</p>
+  <ul>
+    <li><code>[ServerDomain]/api/https://host/path</code>：直观，但路径里的 <code>//</code> 会被 Vercel 归一化并先回一次 <code>308</code> 跳转，多一跳、且部分客户端不跟随 POST 重定向。</li>
+    <li><code>[ServerDomain]/api/https/host/path</code>：路径里没有 <code>//</code>，不触发跳转，<strong>推荐</strong>。缺陷写法 <code>/api/https:/host/path</code>（只有一个斜杠）也会被自动修复。</li>
+  </ul>
   <ul>
     <li>请求方法：保持原始方法。</li>
     <li>请求头：保留客户端的端到端请求头，并排除 Host、Connection、Content-Length 等逐跳或运行时管理的请求头。</li>
     <li>来源伪造：Referer 设置为目标站点根地址，Origin 设置为目标站点源。</li>
-    <li>请求体：转发 POST、PUT、PATCH 和 QUERY 方法的请求体。</li>
+    <li>请求体：转发 POST、PUT、PATCH 和 QUERY 方法的请求体，<strong>按原始 Content-Type 还原</strong>——表单体仍是 <code>application/x-www-form-urlencoded</code>（不会被改写成 JSON 字符串），JSON 体保持 JSON，multipart / 二进制体按原始字节透传。</li>
     <li>DELETE 请求体：仅在目标 API 明确支持时使用，代理会在客户端提供时转发。</li>
     <li>GET 和 HEAD：不附加请求体。</li>
     <li>OPTIONS：由代理用于 CORS 预检，不会转发到目标服务器。</li>
-    <li>响应处理：根据 <code>Content-Type</code> 返回 JSON 或文本。</li>
+    <li>响应处理：<strong>原样透传字节</strong>，不重新序列化（JSON 的空白、字段顺序、上游 <code>Content-Type</code> 都保持原样）。</li>
     <li>限制：只允许以下 Content-Type：
       <ul>
         <li><code>text/*</code></li>
         <li><code>application/json</code></li>
         <li><code>application/xml</code></li>
+        <li><code>text/xml</code></li>
         <li><code>application/x-www-form-urlencoded</code></li>
         <li><code>multipart/form-data</code></li>
         <li><code>application/octet-stream</code></li>
         <li><code>application/x-ndjson</code></li>
+        <li><code>text/event-stream</code></li>
         <li><code>application/vnd.api+json</code></li>
       </ul>
     </li>
-    <li>大小检查：先通过 HEAD 请求判断文件大小，超过 1MB 会直接拒绝。</li>
+    <li>大小检查：按<strong>实际响应</strong>的 <code>Content-Length</code> 判断，超过 1MB 拒绝（不再额外发 HEAD，少一跳）。</li>
   </ul>
   <div class="example">
     <strong>示例：</strong><br>
-    <code>GET [ServerDomain]/api/https://api.example.com/data</code><br>
-    <code>POST [ServerDomain]/api/https://api.example.com/submit</code><br>
-    <code>QUERY [ServerDomain]/api/https://api.example.com/search</code>
+    <code>GET [ServerDomain]/api/https/api.example.com/data</code><br>
+    <code>POST [ServerDomain]/api/https/api.example.com/submit</code><br>
+    <code>QUERY [ServerDomain]/api/https/api.example.com/search</code>
   </div>
 
   <h2>/fetch/ 接口</h2>
@@ -85,10 +92,10 @@
     <tr><th>特性</th><th>/api/</th><th>/fetch/</th></tr>
     <tr><td>请求方法</td><td>保持原始方法（GET/POST/QUERY 等）</td><td>统一为 GET</td></tr>
     <tr><td>请求头</td><td>保留端到端请求头，伪造 Referer 和 Origin</td><td>保留端到端请求头，伪造 Referer 和 Origin</td></tr>
-    <tr><td>请求体</td><td>转发 POST、PUT、PATCH、QUERY；按目标 API 约定转发 DELETE</td><td>不支持</td></tr>
-    <tr><td>响应处理</td><td>按 Content-Type 返回 JSON 或文本</td><td>返回原始二进制数据</td></tr>
-    <tr><td>类型限制</td><td>仅允许指定 Content-Type</td><td>无限制</td></tr>
-    <tr><td>大小限制</td><td>HEAD 检查，超过 1MB 拒绝</td><td>HEAD 检查，超过 1MB 拒绝</td></tr>
+    <tr><td>请求体</td><td>转发 POST、PUT、PATCH、QUERY；按目标 API 约定转发 DELETE；<strong>按原始 Content-Type 还原</strong></td><td>不支持</td></tr>
+    <tr><td>响应处理</td><td>原样透传字节（不重新序列化）</td><td>返回原始二进制数据</td></tr>
+    <tr><td>类型限制</td><td>仅允许指定 Content-Type（按实际响应判断）</td><td>无限制</td></tr>
+    <tr><td>大小限制</td><td>按实际响应的 Content-Length 判断，超过 1MB 拒绝</td><td>HEAD 预检，超过 1MB 拒绝</td></tr>
     <tr><td>典型场景</td><td>调用 API（如 OpenAI）</td><td>加载仅限本域名访问的资源（如图片、文件）</td></tr>
   </table>
 </body>
